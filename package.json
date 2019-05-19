@@ -1,0 +1,15 @@
+{
+  "name": "serverless-python-oai-index-example",
+  "version": "1.0.0",
+  "description": "",
+  "main": "handler.py",
+  "scripts": {
+    "deploy": "serverless deploy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache 2.0",
+  "devDependencies": {    
+    "serverless": "^1.34.1"
+  }
+}

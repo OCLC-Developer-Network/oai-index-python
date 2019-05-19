@@ -1,0 +1,4 @@
+boto3>=1.9.60
+datetime>=4.3
+pathlib>=1.0
+pyoai>=2.5
