@@ -23,16 +23,14 @@ es = Elasticsearch(
     connection_class = RequestsHttpConnection
 )
 
-def run(event, context):
+def indexCollection(URL, metadata_prefix, collection):
     #pull data from OAI endpoint
     registry = MetadataRegistry()
     registry.registerReader('oai_dc', oai_dc_reader)
-    url_base = 'http://contentdm.marinlibrary.org'
-    URL = url_base + '/oai/oai.php'
     client = Client(URL, registry, force_http_get=True)
 
-    harvested_data = [];
-    for record in client.listRecords(metadataPrefix='oai_dc'):
+    harvested_data = []
+    for record in client.listRecords(metadataPrefix=metadata_prefix, set=collection):
         if not record[0].isDeleted():
             fields = record[1].getMap();
             fields['subjects'] = fields['subject'][0].split(';')
@@ -74,4 +72,12 @@ def run(event, context):
     helpers.bulk(es, harvested_data, index='digital_collection_recs', doc_type='_doc')
     
     return "success"
+
+url_base = 'http://contentdm.marinlibrary.org'
+URL = url_base + '/oai/oai.php'
+metadata_prefix = 'oai_dc'
+collection = 'earthquake'
+
+print(indexCollection(URL, metadata_prefix, collection))
+        
              
