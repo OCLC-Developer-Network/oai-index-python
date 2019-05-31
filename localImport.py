@@ -4,6 +4,7 @@ from requests_aws4auth import AWS4Auth
 import yaml
 from oaipmh.client import Client
 from oaipmh.metadata import MetadataRegistry, oai_dc_reader
+import sys, getopt
 
 credentials = boto3.Session().get_credentials()
 
@@ -72,12 +73,26 @@ def indexCollection(URL, metadata_prefix, collection):
     helpers.bulk(es, harvested_data, index='digital_collection_recs', doc_type='_doc')
     
     return "success"
-
-url_base = 'http://contentdm.marinlibrary.org'
-URL = url_base + '/oai/oai.php'
-metadata_prefix = 'oai_dc'
-collection = 'earthquake'
-
+    
+try:
+    opts, args = getopt.getopt(sys.argv,"hu:p:m:c",["baseURL=","oaipmhPath=", "metadataPrefix", "collectionId"])
+except getopt.GetoptError:
+    print 'localimport.py -u <baseURL> -p <oaipmhPath> -m <metadataPrefix> -c <collectionId>'
+    sys.exit(2)
+for opt, arg in opts:
+if opt == '-h':
+   print 'localimport.py -u <baseURL> -p <oaipmhPath> -m <metadataPrefix> -c <collectionId>'
+   sys.exit()
+elif opt in ("-u", "--baseURL"):
+   url_base = arg
+elif opt in ("-p", "--oaipmhPath"):
+   URL = url_base + arg
+elif opt in ("-m", "--metadataPrefix"):
+   metadata_prefix = arg
+elif opt in ("-c", "--collectionId"):
+   collection = arg          
+    
+#http://contentdm.marinlibrary.org /oai/oai.php oai_dc earthquake
 print(indexCollection(URL, metadata_prefix, collection))
         
              
