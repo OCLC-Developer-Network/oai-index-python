@@ -4,7 +4,7 @@ from requests_aws4auth import AWS4Auth
 import yaml
 from oaipmh.client import Client
 from oaipmh.metadata import MetadataRegistry, oai_dc_reader
-import sys, getopt
+import argparse
 
 credentials = boto3.Session().get_credentials()
 
@@ -24,7 +24,7 @@ es = Elasticsearch(
     connection_class = RequestsHttpConnection
 )
 
-def indexCollection(URL, metadata_prefix, collection):
+def indexCollection(URL, url_base, metadata_prefix, collection, action):
     #pull data from OAI endpoint
     registry = MetadataRegistry()
     registry.registerReader('oai_dc', oai_dc_reader)
@@ -34,65 +34,60 @@ def indexCollection(URL, metadata_prefix, collection):
     for record in client.listRecords(metadataPrefix=metadata_prefix, set=collection):
         if not record[0].isDeleted():
             fields = record[1].getMap();
-            fields['subjects'] = fields['subject'][0].split(';')
-            del fields['subject']
+            if fields['subject']:
+                fields['subjects'] = fields['subject'][0].split(';')
+                del fields['subject']
             fields['set'] = record[0].setSpec()
             identifier = record[0].identifier().split(':')[2]
             fields['image_url_base'] = url_base + '/digital/iiif/' + identifier + '/'
             harvested_data.append(fields)
-        
-    es.indices.delete(index='digital_collection_recs', ignore=[400, 404])
     
-    mapping = {
-            "mappings":{
-                "_doc":{
-                    "properties": {
-                        "title": {"type": "text"}, 
-                        "creator": {"type": "text"},
-                        "subjects": {"type": "text"}, 
-                        "description": {"type": "text"},
-                        "publisher": {"type": "text"},
-                        "contributor": {"type": "text"},
-                        "date": {"type": "text"},
-                        "type": {"type": "text", "fielddata": "true"},
-                        "format": {"type": "text", "fielddata": "true"},
-                        "identifier": {"type": "text"},
-                        "source": {"type": "text"},
-                        "language": {"type": "text", "fielddata": "true"},
-                        "relation": {"type": "text"},
-                        "coverage": {"type": "text"},
-                        "rights": {"type": "text"},
-                        "set": {"type": "text", "fielddata": "true"},
-                        "image_url_base": {"type": "text"}
+    if action is 'reindex':    
+        es.indices.delete(index='digital_collection_recs', ignore=[400, 404])
+    
+        mapping = {
+                "mappings":{
+                    "_doc":{
+                        "properties": {
+                            "title": {"type": "text"}, 
+                            "creator": {"type": "text"},
+                            "subjects": {"type": "text"}, 
+                            "description": {"type": "text"},
+                            "publisher": {"type": "text"},
+                            "contributor": {"type": "text"},
+                            "date": {"type": "text"},
+                            "type": {"type": "text", "fielddata": "true"},
+                            "format": {"type": "text", "fielddata": "true"},
+                            "identifier": {"type": "text"},
+                            "source": {"type": "text"},
+                            "language": {"type": "text", "fielddata": "true"},
+                            "relation": {"type": "text"},
+                            "coverage": {"type": "text"},
+                            "rights": {"type": "text"},
+                            "set": {"type": "text", "fielddata": "true"},
+                            "image_url_base": {"type": "text"}
+                        }
                     }
                 }
-            }
-        }                
-    es.indices.create(index='digital_collection_recs', body=mapping)
+            }                
+        es.indices.create(index='digital_collection_recs', body=mapping)
     
     helpers.bulk(es, harvested_data, index='digital_collection_recs', doc_type='_doc')
     
     return "success"
-    
-try:
-    opts, args = getopt.getopt(sys.argv,"hu:p:m:c",["baseURL=","oaipmhPath=", "metadataPrefix", "collectionId"])
-except getopt.GetoptError:
-    print 'localimport.py -u <baseURL> -p <oaipmhPath> -m <metadataPrefix> -c <collectionId>'
-    sys.exit(2)
-for opt, arg in opts:
-if opt == '-h':
-   print 'localimport.py -u <baseURL> -p <oaipmhPath> -m <metadataPrefix> -c <collectionId>'
-   sys.exit()
-elif opt in ("-u", "--baseURL"):
-   url_base = arg
-elif opt in ("-p", "--oaipmhPath"):
-   URL = url_base + arg
-elif opt in ("-m", "--metadataPrefix"):
-   metadata_prefix = arg
-elif opt in ("-c", "--collectionId"):
-   collection = arg          
-    
-#http://contentdm.marinlibrary.org /oai/oai.php oai_dc earthquake
-print(indexCollection(URL, metadata_prefix, collection))
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-u','--baseURL', help='Base url for repository', required=True)
+parser.add_argument('-p','--oaipmhPath', help='Path to oai-pmh endpoint', required=True)
+parser.add_argument('-m','--metadataPrefix', help='metadata prefix', required=True)
+parser.add_argument('-c','--collectionId', help='collection or set id', required=True)
+parser.add_argument('-a','--action', help='action to do - add or reindex', required=True)
+
+args = parser.parse_args()
+
+URL = args.baseURL + args.oaipmhPath;
+
+#localimport.py -u <baseURL> -p <oaipmhPath> -m <metadataPrefix> -c <collectionId>                 
+print(indexCollection(URL, args.baseURL, args.metadataPrefix, args.collectionId, args.action))
         
              
